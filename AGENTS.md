@@ -6,4 +6,4 @@
 - The tool never makes a network call (a test enforces it). It only reads files and runs `git ls-files`.
 - A new check returns findings with what, where, why and fix, each one sentence. Prefer missing a
   case over a noisy false positive; run it on a few real repos before merging.
-- Releases: bump `package.json`, push tag `vX.Y.Z`; `release.yml` publishes with provenance.
+- Releases: bump `package.json`, push tag `vX.Y.Z`; `release.yml` stages it with provenance (`npm stage publish`); a maintainer approves it on npmjs.com with 2FA.

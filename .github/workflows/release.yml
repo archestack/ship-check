@@ -1,7 +1,7 @@
 name: release
 
-# Push a tag vX.Y.Z that matches package.json. The package is published through npm trusted
-# publishing (OIDC, no token), with provenance.
+# Push a tag vX.Y.Z that matches package.json. The package is staged through npm trusted
+# publishing (OIDC, no token), with provenance; a maintainer approves it on npmjs.com with 2FA.
 on:
   push:
     tags: ['v*']
@@ -32,4 +32,4 @@ jobs:
             const { version } = require("./package.json");
             if (version !== tag) throw new Error(`tag ${tag}, package.json ${version}`);
           '
-      - run: npm publish
+      - run: npm stage publish
