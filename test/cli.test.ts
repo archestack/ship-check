@@ -154,6 +154,21 @@ describe('supabase', () => {
     );
   });
 
+  it('counts the bare PUBLIC_ prefix only as an env name, and skips docs', () => {
+    const root = project({
+      '.env': 'PUBLIC_STRIPE_SECRET=x\n',
+      'src/a.ts':
+        'const PUBLIC_SECRET_PATTERN = /x/;\nconst k = import.meta.env.PUBLIC_API_SECRET;\n',
+      'docs/setup.md': 'Never set VITE_SUPABASE_SERVICE_ROLE_KEY.\n',
+    });
+    assert.deepEqual(
+      run(root)
+        .findings.filter((f) => f.rule === 'client/public-secret-env')
+        .map((f) => `${f.file}:${f.line}`),
+      ['.env:1', 'src/a.ts:2'],
+    );
+  });
+
   it('ignores SQL in a project that does not use Supabase', () => {
     assert.deepEqual(run(project({ 'db/schema.sql': 'create table notes (id int);\n' })).rules, []);
   });

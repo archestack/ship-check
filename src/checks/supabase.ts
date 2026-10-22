@@ -16,9 +16,12 @@ const DISABLE_RLS = new RegExp(
 const CREATE_POLICY = /create\s+policy[^;]*;/gi;
 const OPEN_POLICY = /(?:using|with\s+check)\s*\(\s*true\s*\)/i;
 
-// Env names a bundler ships to the browser that look like a server secret.
+// Env names a bundler ships to the browser that look like a server secret. The bare PUBLIC_ prefix
+// (SvelteKit, Astro) counts only at a line start or after `env.`, so constants named PUBLIC_* do not.
 const PUBLIC_SECRET_ENV =
-  /\b(?:NEXT_PUBLIC_|VITE_|EXPO_PUBLIC_|REACT_APP_|NUXT_PUBLIC_|PUBLIC_)[A-Z0-9_]*(?:SERVICE_ROLE|SERVICE_KEY|SECRET_KEY|SECRET)[A-Z0-9_]*\b/g;
+  /(?:\b(?:NEXT_PUBLIC_|VITE_|EXPO_PUBLIC_|REACT_APP_|NUXT_PUBLIC_)|(?<=^|env\.)PUBLIC_)[A-Z0-9_]*(?:SERVICE_ROLE|SERVICE_KEY|SECRET)[A-Z0-9_]*\b/gm;
+// Docs that only name the variable are not shipped anywhere.
+const DOCS = /\.(?:md|mdx|txt)$/;
 const USE_CLIENT = /^\s*(?:\/\/[^\n]*\n\s*)*['"]use client['"]/;
 
 const tableName = (raw: string): { schema: string; table: string } => {
@@ -100,7 +103,7 @@ const rls = (files: SourceFile[]): Finding[] => {
 const clientKeys = (files: SourceFile[]): Finding[] =>
   files.flatMap((file) => {
     const found: Finding[] = [];
-    for (const m of file.text.matchAll(PUBLIC_SECRET_ENV)) {
+    for (const m of DOCS.test(file.path) ? [] : file.text.matchAll(PUBLIC_SECRET_ENV)) {
       found.push({
         rule: 'client/public-secret-env',
         severity: 'critical',

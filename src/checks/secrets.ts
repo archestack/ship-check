@@ -1,8 +1,8 @@
 import { type Check, type Finding, type Severity, lineAt } from '../types.js';
 
 // Key formats adapted from gitleaks (https://github.com/gitleaks/gitleaks, MIT License, Copyright (c)
-// 2019 Zachary Rice). Only formats with a
-// fixed prefix, so a match is almost always a real key; no entropy guessing.
+// 2019 Zachary Rice). Only formats with a fixed prefix, so a match is almost always a real key; no
+// entropy guessing.
 interface Rule {
   id: string;
   name: string;
