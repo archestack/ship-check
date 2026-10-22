@@ -1,0 +1,63 @@
+{
+  "name": "@archestack/ship-check",
+  "version": "0.1.0",
+  "description": "Find ship blockers in vibe-coded apps before launch: committed secrets, Supabase RLS gaps, open Firebase rules, API routes with no auth check. Runs offline.",
+  "license": "MIT",
+  "author": "Archestack (https://archestack.com/)",
+  "homepage": "https://github.com/archestack/ship-check#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/archestack/ship-check.git"
+  },
+  "bugs": {
+    "url": "https://github.com/archestack/ship-check/issues"
+  },
+  "keywords": [
+    "security",
+    "scanner",
+    "secrets",
+    "supabase",
+    "rls",
+    "firebase",
+    "nextjs",
+    "lovable",
+    "bolt",
+    "v0",
+    "cursor",
+    "vibe-coding",
+    "agents-md",
+    "cli"
+  ],
+  "type": "module",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "bin": {
+    "ship-check": "dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . && prettier --check src test",
+    "test": "npm run build && node --test test/*.test.ts",
+    "prepublishOnly": "npm run lint && npm run typecheck && npm test"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^24.19.0",
+    "eslint": "^10.12.0",
+    "prettier": "^3.9.9",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.71.1"
+  }
+}
