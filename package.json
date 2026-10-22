@@ -1,6 +1,6 @@
 {
   "name": "@archestack/ship-check",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Find ship blockers in vibe-coded apps before launch: committed secrets, Supabase RLS gaps, open Firebase rules, API routes with no auth check. Runs offline.",
   "license": "MIT",
   "author": "Archestack (https://archestack.com/)",
