@@ -58,6 +58,18 @@ ship-check [folder] [--json] [--fail-on critical|high|medium|low|never]
 In a git repository it scans the files git would commit and skips what `.gitignore` covers. Outside
 git it scans everything except `node_modules`, build output and lock files.
 
+## Ignoring a finding
+
+Once you have checked a finding and it is fine (a fake key in a test, a table that is public on
+purpose), silence it so CI can stay on:
+
+- Add `ship-check-ignore` in a comment on the same line, or on its own comment line just above it.
+- Or list paths in a `.shipcheckignore` file at the project root, one per line, gitignore style
+  (`test/`, `**/fixtures/**`, `*.sql`). Add a rule id after the path to silence only that rule
+  there: `supabase/seed.sql supabase/rls-off`. Rule ids are in the `--json` output.
+
+The report header says how many findings were ignored, so nothing disappears silently.
+
 ## In CI
 
 ```yaml
