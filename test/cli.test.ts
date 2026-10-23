@@ -299,6 +299,40 @@ describe('cli', () => {
   });
 });
 
+describe('ignores', () => {
+  const stripe = 'sk_' + 'live_' + 'a1B2c3D4e5F6g7H8i9J0k1L2';
+  const gh = 'ghp' + '_' + 'A'.repeat(36);
+
+  it('a ship-check-ignore comment on the line or the line above silences it', () => {
+    const root = project({
+      'src/a.ts': `// ship-check-ignore\nconst s = "${stripe}";\nconst g = '${gh}'; // ship-check-ignore\nconst t = '${gh}';\n`,
+    });
+    const res = run(root);
+    assert.deepEqual(
+      res.findings.map((f) => f.line),
+      [4],
+    );
+    assert.equal(JSON.parse(res.stdout).ignored, 2);
+  });
+
+  it('.shipcheckignore silences paths, globs and one rule per path', () => {
+    const root = project({
+      '.shipcheckignore': `# reviewed\ntest/\n**/fixtures/**/*.ts\nsrc/b.ts secret/github-token\n`,
+      'test/a.ts': `const s = "${stripe}";\n`,
+      'pkg/fixtures/deep/a.ts': `const s = "${stripe}";\n`,
+      'src/b.ts': `const s = "${stripe}";\nconst g = '${gh}';\n`,
+      'src/test.ts': `const s = "${stripe}";\n`,
+    });
+    const res = run(root);
+    assert.deepEqual(
+      res.findings.map((f) => `${f.file} ${f.rule}`),
+      ['src/b.ts secret/stripe-secret-key', 'src/test.ts secret/stripe-secret-key'],
+    );
+    const text = spawnSync('node', [CLI, root], { encoding: 'utf8' }).stdout;
+    assert.match(text, /3 ignored/);
+  });
+});
+
 describe('offline', () => {
   it('no source file imports a network module or calls fetch', () => {
     const src = new URL('../src/', import.meta.url).pathname;

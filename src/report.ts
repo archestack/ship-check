@@ -3,8 +3,12 @@ import { SEVERITIES } from './types.js';
 
 export const FIX_URL = 'https://archestack.com/services/?ref=ship-check#audit-h';
 
-export const textReport = ({ filesScanned, findings }: ScanResult, version: string): string => {
-  const out = [`ship-check ${version} · ${filesScanned} files scanned`, ''];
+export const textReport = (
+  { filesScanned, findings, ignored }: ScanResult,
+  version: string,
+): string => {
+  const skipped = ignored ? ` · ${ignored} ignored` : '';
+  const out = [`ship-check ${version} · ${filesScanned} files scanned${skipped}`, ''];
   if (findings.length === 0) {
     out.push('No ship blockers found. This is a pattern scan of the code, not a full audit.');
     return out.join('\n');
