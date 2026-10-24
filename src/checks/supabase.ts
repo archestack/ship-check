@@ -100,6 +100,91 @@ const rls = (files: SourceFile[]): Finding[] => {
   return findings;
 };
 
+const BUCKETS = String.raw`"?storage"?\s*\.\s*"?buckets"?`;
+const INSERT_BUCKET = new RegExp(
+  String.raw`insert\s+into\s+${BUCKETS}\s*\(([^)]*)\)\s*values\s*([^;]*)`,
+  'gi',
+);
+const UPDATE_BUCKET = new RegExp(
+  String.raw`update\s+${BUCKETS}\s+set\s+[^;]*?\bpublic\s*=\s*true\b[^;]*`,
+  'gi',
+);
+// Supabase CLI config: a [storage.buckets.<name>] section with `public = true`.
+const CONFIG_BUCKET = /^\[storage\.buckets\.([\w-]+)\]([^[]*)/gm;
+
+/** Splits `(a, 'b, c', f(d)), (e)` into tuples of top-level values. */
+const tuples = (values: string): string[][] => {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let cell = '';
+  let depth = 0;
+  let quoted = false;
+  for (const ch of values) {
+    if (ch === "'") quoted = !quoted;
+    if (!quoted && ch === '(') {
+      if (depth++ === 0) continue;
+    } else if (!quoted && ch === ')') {
+      if (--depth === 0) {
+        rows.push([...row, cell.trim()]);
+        row = [];
+        cell = '';
+        continue;
+      }
+    } else if (!quoted && ch === ',' && depth === 1) {
+      row.push(cell.trim());
+      cell = '';
+      continue;
+    }
+    if (depth > 0) cell += ch;
+  }
+  return rows;
+};
+
+const publicBucket = (file: string, line: number, name: string): Finding => ({
+  rule: 'supabase/public-bucket',
+  severity: 'medium',
+  title: `Storage bucket ${name} is public`,
+  file,
+  line,
+  why: 'Every file in a public bucket can be downloaded by anyone who has its URL, with no policy check; fine for avatars and site images, a leak for uploads, invoices or IDs.',
+  fix: 'Keep the bucket private, add storage.objects policies that check auth.uid(), and hand out signed URLs.',
+});
+
+const buckets = (files: SourceFile[]): Finding[] =>
+  files.flatMap((file) => {
+    const found: Finding[] = [];
+    if (file.path.endsWith('.sql')) {
+      for (const m of file.text.matchAll(INSERT_BUCKET)) {
+        const columns = (m[1] ?? '')
+          .split(',')
+          .map((c) => c.trim().replaceAll('"', '').toLowerCase());
+        const at = columns.indexOf('public');
+        if (at < 0) continue;
+        for (const row of tuples(m[2] ?? '')) {
+          if (row[at]?.toLowerCase() !== 'true') continue;
+          const id = row[columns.indexOf('id')] ?? row[columns.indexOf('name')] ?? '';
+          found.push(
+            publicBucket(
+              file.path,
+              lineAt(file.text, m.index ?? 0),
+              id.replaceAll("'", '') || '(unnamed)',
+            ),
+          );
+        }
+      }
+      for (const m of file.text.matchAll(UPDATE_BUCKET)) {
+        const id = /\b(?:id|name)\s*=\s*'([^']*)'/i.exec(m[0])?.[1] ?? '(all matching)';
+        found.push(publicBucket(file.path, lineAt(file.text, m.index ?? 0), id));
+      }
+    } else if (file.path.endsWith('supabase/config.toml')) {
+      for (const m of file.text.matchAll(CONFIG_BUCKET)) {
+        if (/^\s*public\s*=\s*true\b/m.test(m[2] ?? ''))
+          found.push(publicBucket(file.path, lineAt(file.text, m.index ?? 0), m[1] ?? ''));
+      }
+    }
+    return found;
+  });
+
 const clientKeys = (files: SourceFile[]): Finding[] =>
   files.flatMap((file) => {
     const found: Finding[] = [];
@@ -131,6 +216,6 @@ const clientKeys = (files: SourceFile[]): Finding[] =>
   });
 
 export const supabase: Check = ({ files }) => [
-  ...(usesSupabase(files) ? rls(files) : []),
+  ...(usesSupabase(files) ? [...rls(files), ...buckets(files)] : []),
   ...clientKeys(files),
 ];

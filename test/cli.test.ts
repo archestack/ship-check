@@ -154,6 +154,28 @@ describe('supabase', () => {
     );
   });
 
+  it('flags public storage buckets in migrations and config.toml, not private ones', () => {
+    const root = project({
+      ...pkg,
+      'supabase/migrations/1.sql': [
+        'insert into storage.buckets (id, name, public, allowed_mime_types)',
+        "values ('avatars', 'avatars', true, array['image/png']), ('invoices', 'invoices', false, null);",
+        "insert into storage.buckets (id, name) values ('docs', 'docs');",
+        "update storage.buckets set public = true where id = 'uploads';",
+      ].join('\n'),
+      'supabase/config.toml':
+        '[storage.buckets.images]\npublic = true\n\n[storage.buckets.private]\npublic = false\n',
+    });
+    assert.deepEqual(
+      run(root).findings.map((f) => `${f.file} ${f.line} ${f.title}`),
+      [
+        'supabase/config.toml 1 Storage bucket images is public',
+        'supabase/migrations/1.sql 1 Storage bucket avatars is public',
+        'supabase/migrations/1.sql 4 Storage bucket uploads is public',
+      ],
+    );
+  });
+
   it('counts the bare PUBLIC_ prefix only as an env name, and skips docs', () => {
     const root = project({
       '.env': 'PUBLIC_STRIPE_SECRET=x\n',

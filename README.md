@@ -16,7 +16,7 @@ It reads your files and nothing else. No account, no upload, no network calls.
 | --- | --- |
 | Secrets | Live keys with a known format: Stripe, OpenAI, Anthropic, AWS, GitHub, Slack, SendGrid, Supabase secret and service-role keys, private key blocks, database URLs with a password. The Supabase anon key is public by design and is not flagged. |
 | .env files | `.env`, `.env.local`, `.env.production` and friends that git would commit (tracked, or not covered by `.gitignore`). `.env.example` is fine. |
-| Supabase | Tables in the `public` schema without row level security, RLS turned off, policies with `using (true)` on writes, and the service-role key used in a `"use client"` file. |
+| Supabase | Tables in the `public` schema without row level security, RLS turned off, policies with `using (true)` on writes, storage buckets made public in a migration or `config.toml`, and the service-role key used in a `"use client"` file. |
 | Public env names | `NEXT_PUBLIC_`, `VITE_`, `EXPO_PUBLIC_`, `REACT_APP_` variables that hold a secret or service-role key. Those end up in the browser. |
 | Firebase | `allow read, write: if true`, rules with no condition, test-mode date rules, and `".write": true` in Realtime Database rules. |
 | API routes | Next.js route handlers and `pages/api` files, and Express-style `app.post(...)` routes, that change data and contain no sign of an auth or session check. This one is a heuristic, so it is reported as medium. |
