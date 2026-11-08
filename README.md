@@ -47,11 +47,12 @@ Want a developer to fix these? https://archestack.com/services/?ref=ship-check#a
 ## Options
 
 ```text
-ship-check [folder] [--json] [--fail-on critical|high|medium|low|never]
+ship-check [folder] [--json | --sarif] [--fail-on critical|high|medium|low|never]
 ```
 
 - `folder` defaults to the current folder.
 - `--json` prints the findings as JSON.
+- `--sarif` prints them as SARIF 2.1.0, which GitHub code scanning reads (see below).
 - `--fail-on` sets when the exit code is 1. The default is `high`, so medium and low findings do
   not fail a build. Exit code 2 means bad arguments.
 
@@ -74,6 +75,16 @@ The report header says how many findings were ignored, so nothing disappears sil
 
 ```yaml
 - run: npx -y @archestack/ship-check --fail-on high
+```
+
+To see findings in the repository's Security tab and on pull request lines, write SARIF and upload
+it (the job needs `security-events: write`):
+
+```yaml
+- run: npx -y @archestack/ship-check --sarif --fail-on never > ship-check.sarif
+- uses: github/codeql-action/upload-sarif@v4
+  with:
+    sarif_file: ship-check.sarif
 ```
 
 ## Limits

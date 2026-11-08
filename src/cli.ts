@@ -3,6 +3,7 @@ import { readFileSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { textReport } from './report.js';
+import { sarifReport } from './sarif.js';
 import { scan } from './scan.js';
 import { SEVERITIES, type Severity } from './types.js';
 
@@ -14,6 +15,7 @@ problems. Runs offline; nothing leaves your machine.
 
 Options:
   --json             print findings as JSON
+  --sarif            print findings as SARIF 2.1.0 (GitHub code scanning)
   --fail-on <level>  exit 1 when a finding is at this level or worse:
                      critical, high (default), medium, low, never
   -v, --version      print the version
@@ -28,6 +30,7 @@ const main = (): number => {
       allowPositionals: true,
       options: {
         json: { type: 'boolean' },
+        sarif: { type: 'boolean' },
         'fail-on': { type: 'string', default: 'high' },
         version: { type: 'boolean', short: 'v' },
         help: { type: 'boolean', short: 'h' },
@@ -41,6 +44,10 @@ const main = (): number => {
   if (values.help) return (console.log(HELP), 0);
   if (values.version) return (console.log(version), 0);
 
+  if (values.json && values.sarif) {
+    console.error('Pick one of --json and --sarif');
+    return 2;
+  }
   const failOn = values['fail-on'];
   if (failOn !== 'never' && !SEVERITIES.includes(failOn as Severity)) {
     console.error(`--fail-on must be one of ${SEVERITIES.join(', ')}, never`);
@@ -54,7 +61,11 @@ const main = (): number => {
 
   const result = scan(root);
   console.log(
-    values.json ? JSON.stringify({ version, ...result }, null, 2) : textReport(result, version),
+    values.json
+      ? JSON.stringify({ version, ...result }, null, 2)
+      : values.sarif
+        ? JSON.stringify(sarifReport(result, version), null, 2)
+        : textReport(result, version),
   );
   if (failOn === 'never') return 0;
   const limit = SEVERITIES.indexOf(failOn as Severity);

@@ -319,6 +319,45 @@ describe('cli', () => {
     const root = project({ '.env': 'A=1\n' }, { git: true });
     assert.equal(run(root, '--fail-on', 'never').status, 0);
   });
+
+  it('--sarif writes SARIF 2.1.0 that GitHub code scanning reads', () => {
+    const root = project({
+      'package.json': '{"dependencies":{"@supabase/supabase-js":"2"}}',
+      'AGENTS.md': '',
+      'supabase/migrations/1_init.sql':
+        'create table notes (id int);\ncreate table tags (id int);\n',
+    });
+    const res = spawnSync('node', [CLI, root, '--sarif'], { encoding: 'utf8' });
+    assert.equal(res.status, 1);
+    const sarif = JSON.parse(res.stdout);
+    assert.equal(sarif.version, '2.1.0');
+    const [runLog] = sarif.runs;
+    assert.equal(runLog.tool.driver.name, 'ship-check');
+    assert.deepEqual(
+      runLog.tool.driver.rules.map((r: { id: string }) => r.id),
+      ['supabase/rls-off'],
+    );
+    assert.equal(runLog.results.length, 2);
+    const [first] = runLog.results;
+    assert.equal(first.ruleIndex, 0);
+    assert.equal(first.level, 'error');
+    assert.equal(first.properties['security-severity'], '8.0');
+    assert.deepEqual(first.locations[0].physicalLocation, {
+      artifactLocation: { uri: 'supabase/migrations/1_init.sql', uriBaseId: '%SRCROOT%' },
+      region: { startLine: 1 },
+    });
+  });
+
+  it('--sarif on a clean project has no results and exits 0', () => {
+    const root = project({ 'package.json': '{"name":"x"}', 'AGENTS.md': '# Rules\n' });
+    const res = spawnSync('node', [CLI, root, '--sarif'], { encoding: 'utf8' });
+    assert.equal(res.status, 0);
+    assert.deepEqual(JSON.parse(res.stdout).runs[0].results, []);
+  });
+
+  it('exits 2 when both --json and --sarif are given', () => {
+    assert.equal(spawnSync('node', [CLI, '.', '--json', '--sarif']).status, 2);
+  });
 });
 
 describe('ignores', () => {
