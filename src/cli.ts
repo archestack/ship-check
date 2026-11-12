@@ -10,8 +10,8 @@ import { SEVERITIES, type Severity } from './types.js';
 const HELP = `Usage: ship-check [folder] [options]
 
 Scans a project folder for ship blockers: committed secrets and .env files, Supabase tables without
-row level security, open Firebase rules, API routes with no auth check, and AGENTS.md / CLAUDE.md
-problems. Runs offline; nothing leaves your machine.
+row level security, open Firebase rules, API routes with no auth check, AGENTS.md / CLAUDE.md
+problems, and keys inlined into a client build on disk (.next/static, dist with index.html, ...). Runs offline; nothing leaves your machine.
 
 Options:
   --json             print findings as JSON

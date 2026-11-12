@@ -394,6 +394,50 @@ describe('ignores', () => {
   });
 });
 
+describe('built bundle', () => {
+  const stripe = 'sk_' + 'live_' + 'a1B2c3D4e5F6g7H8i9J0k1L2';
+  const openai = 'sk-' + 'proj-' + 'Ab3'.repeat(10);
+
+  it('finds a key Next.js inlined into .next/static even when .next is gitignored', () => {
+    const root = project(
+      {
+        '.gitignore': '.next\n',
+        'src/a.ts': 'export const k = process.env.NEXT_PUBLIC_OPENAI_KEY;\n',
+        '.next/static/chunks/app/page-1a2b.js': `(()=>{const k="${openai}";fetch(u,{headers:{a:k}})})();`,
+        '.next/server/app/page.js': `const s="${stripe}";`,
+      },
+      { git: true },
+    );
+    const res = run(root);
+    assert.equal(res.status, 1);
+    assert.deepEqual(
+      res.findings.map((f) => `${f.file} ${f.rule} ${f.severity}`),
+      ['.next/static/chunks/app/page-1a2b.js bundle/openai-key critical'],
+    );
+    assert.ok(!res.stdout.includes(openai), 'full key never printed');
+  });
+
+  it('reads dist only when it is a web build with index.html', () => {
+    const files = { 'dist/assets/index-9f.js': `var k="${stripe}";` };
+    const web = run(project({ ...files, 'dist/index.html': '<script src="/assets/index-9f.js">' }));
+    assert.deepEqual(web.rules, ['bundle/stripe-secret-key']);
+    const server = run(project({ ...files, 'dist/server.js': 'listen()' }));
+    assert.deepEqual(server.rules, []);
+  });
+
+  it('skips the public Supabase anon key and honours .shipcheckignore', () => {
+    const anon = jwt({ role: 'anon', iss: 'supabase' });
+    const root = project({
+      'build/index.html': `<script>window.k="${anon}"</script>`,
+      'build/static/js/main.js': `var k="${stripe}";`,
+      '.shipcheckignore': 'build/static/js/main.js bundle/stripe-secret-key\n',
+    });
+    const res = run(root);
+    assert.deepEqual(res.rules, []);
+    assert.match(spawnSync('node', [CLI, root], { encoding: 'utf8' }).stdout, /1 ignored/);
+  });
+});
+
 describe('offline', () => {
   it('no source file imports a network module or calls fetch', () => {
     const src = new URL('../src/', import.meta.url).pathname;
