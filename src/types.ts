@@ -20,6 +20,8 @@ export interface SourceFile {
 export interface Project {
   root: string;
   files: SourceFile[];
+  /** Client build output on disk (`.next/static`, a `dist` with index.html, ...), read only for keys. */
+  bundle: SourceFile[];
   /** True when the file list came from git, so ignored files are already left out. */
   git: boolean;
   exists: (relativePath: string) => boolean;

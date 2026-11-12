@@ -1,5 +1,6 @@
 import { agentFiles } from './checks/agent-files.js';
 import { apiAuth } from './checks/api-auth.js';
+import { bundleSecrets } from './checks/bundle.js';
 import { envFiles } from './checks/env-files.js';
 import { firebase } from './checks/firebase.js';
 import { secrets } from './checks/secrets.js';
@@ -8,7 +9,7 @@ import { loadProject } from './files.js';
 import { applyIgnores } from './ignore.js';
 import { type Finding, SEVERITIES } from './types.js';
 
-export const CHECKS = [secrets, envFiles, supabase, firebase, apiAuth, agentFiles];
+export const CHECKS = [secrets, bundleSecrets, envFiles, supabase, firebase, apiAuth, agentFiles];
 
 export interface ScanResult {
   root: string;
@@ -30,5 +31,5 @@ export const scan = (root: string): ScanResult => {
       a.file.localeCompare(b.file) ||
       (a.line ?? 0) - (b.line ?? 0),
   );
-  return { root, filesScanned: project.files.length, findings, ignored };
+  return { root, filesScanned: project.files.length + project.bundle.length, findings, ignored };
 };

@@ -106,27 +106,49 @@ const RULES: Rule[] = [
 const mask = (value: string): string =>
   value.length <= 12 ? `${value.slice(0, 4)}…` : `${value.slice(0, 10)}…`;
 
-export const secrets: Check = ({ files }) => {
-  const findings: Finding[] = [];
-  for (const file of files) {
-    for (const rule of RULES) {
-      const seen = new Set<number>();
-      for (const match of file.text.matchAll(rule.pattern)) {
-        if (rule.keep && !rule.keep(match)) continue;
-        const line = lineAt(file.text, match.index ?? 0);
-        if (seen.has(line)) continue;
-        seen.add(line);
-        findings.push({
-          rule: `secret/${rule.id}`,
-          severity: rule.severity ?? 'critical',
-          title: `${rule.name} in the code (${mask(match[0])})`,
-          file: file.path,
-          line,
-          why: 'Anyone who can read this file can use the key, and git keeps it in history even after you delete the line.',
-          fix: `Revoke it in ${rule.where}, issue a new one, and read it from an environment variable on the server only.`,
-        });
-      }
+export interface KeyMatch {
+  /** Rule id without a prefix, e.g. `stripe-secret-key`. */
+  id: string;
+  name: string;
+  where: string;
+  severity: Severity;
+  /** Masked value, safe to print. */
+  masked: string;
+  line: number;
+}
+
+/** Every key-shaped value in a text, at most one per rule and line. */
+export const findKeys = (text: string): KeyMatch[] => {
+  const out: KeyMatch[] = [];
+  for (const rule of RULES) {
+    const seen = new Set<number>();
+    for (const match of text.matchAll(rule.pattern)) {
+      if (rule.keep && !rule.keep(match)) continue;
+      const line = lineAt(text, match.index ?? 0);
+      if (seen.has(line)) continue;
+      seen.add(line);
+      out.push({
+        id: rule.id,
+        name: rule.name,
+        where: rule.where,
+        severity: rule.severity ?? 'critical',
+        masked: mask(match[0]),
+        line,
+      });
     }
   }
-  return findings;
+  return out;
 };
+
+export const secrets: Check = ({ files }) =>
+  files.flatMap((file): Finding[] =>
+    findKeys(file.text).map((key) => ({
+      rule: `secret/${key.id}`,
+      severity: key.severity,
+      title: `${key.name} in the code (${key.masked})`,
+      file: file.path,
+      line: key.line,
+      why: 'Anyone who can read this file can use the key, and git keeps it in history even after you delete the line.',
+      fix: `Revoke it in ${key.where}, issue a new one, and read it from an environment variable on the server only.`,
+    })),
+  );
