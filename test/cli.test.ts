@@ -208,9 +208,10 @@ describe('supabase', () => {
     });
     const resFour = run(four);
     assert.equal(resFour.rules.filter((r) => r === 'supabase/rls-off').length, 1);
-    assert.match(resFour.findings[0]?.title ?? '', /4 tables/);
-    assert.match(resFour.findings[0]?.title ?? '', /orders/);
-    assert.match(resFour.findings[0]?.fix ?? '', /alter table public\.orders/);
+    const f = resFour.findings[0] as { title: string; fix?: string };
+    assert.match(f?.title ?? '', /4 tables/);
+    assert.match(f?.title ?? '', /orders/);
+    assert.match(f?.fix ?? '', /alter table public\.orders/);
   });
 
   it('ignores SQL in a project that does not use Supabase', () => {
