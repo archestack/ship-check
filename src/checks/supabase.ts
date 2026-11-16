@@ -39,6 +39,10 @@ const usesSupabase = (files: SourceFile[]): boolean =>
       (file.path.endsWith('package.json') && file.text.includes('@supabase/')),
   );
 
+// When 4 or more tables in the same file lack RLS the report becomes noisy; collapse them into one
+// finding at the first table's line so the fix message is actionable without scrolling.
+const GROUP_THRESHOLD = 4;
+
 const rls = (files: SourceFile[]): Finding[] => {
   const sql = files.filter((file) => file.path.endsWith('.sql'));
   const enabled = new Set<string>();
@@ -52,17 +56,38 @@ const rls = (files: SourceFile[]): Finding[] => {
   }
   const findings: Finding[] = [];
   for (const file of sql) {
+    // Collect all public tables without RLS in this file, preserving position of the first match.
+    const missing: Array<{ table: string; line: number }> = [];
     for (const m of file.text.matchAll(CREATE_TABLE)) {
       const { schema, table } = tableName(m[1] ?? '');
       if (schema !== 'public' || enabled.has(`${schema}.${table}`)) continue;
+      missing.push({ table, line: lineAt(file.text, m.index ?? 0) });
+    }
+    if (missing.length > 0 && missing.length < GROUP_THRESHOLD) {
+      for (const { table, line } of missing) {
+        findings.push({
+          rule: 'supabase/rls-off',
+          severity: 'high',
+          title: `Table public.${table} has no row level security`,
+          file: file.path,
+          line,
+          why: 'Every table in the public schema is reachable through the API with the anon key from your site; without RLS anyone can read and change all rows.',
+          fix: `Add \`alter table public.${table} enable row level security;\` and policies that check auth.uid() in a new migration.`,
+        });
+      }
+    } else if (missing.length >= GROUP_THRESHOLD) {
+      const names = missing.map((r) => r.table).join(', ');
+      const alters = missing
+        .map((r) => `alter table public.${r.table} enable row level security;`)
+        .join('\n');
       findings.push({
         rule: 'supabase/rls-off',
         severity: 'high',
-        title: `Table public.${table} has no row level security`,
+        title: `${missing.length} tables have no row level security: ${names}`,
         file: file.path,
-        line: lineAt(file.text, m.index ?? 0),
+        line: missing[0]?.line ?? 1,
         why: 'Every table in the public schema is reachable through the API with the anon key from your site; without RLS anyone can read and change all rows.',
-        fix: `Add \`alter table public.${table} enable row level security;\` and policies that check auth.uid() in a new migration.`,
+        fix: `Add these statements in a new migration:\n${alters}\nThen add policies that check auth.uid() for each table.`,
       });
     }
     for (const m of file.text.matchAll(DISABLE_RLS)) {

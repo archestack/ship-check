@@ -191,6 +191,29 @@ describe('supabase', () => {
     );
   });
 
+  it('groups 4+ rls-off findings in one file into a single finding, keeps individual for fewer', () => {
+    const tables = (names: string[]): string =>
+      names.map((n) => `create table public.${n} (id int);\n`).join('');
+    // Three tables → three individual findings.
+    const three = project({
+      ...pkg,
+      'supabase/migrations/1.sql': tables(['a', 'b', 'c']),
+    });
+    const resThree = run(three);
+    assert.equal(resThree.rules.filter((r) => r === 'supabase/rls-off').length, 3);
+    // Four tables → one grouped finding.
+    const four = project({
+      ...pkg,
+      'supabase/migrations/1.sql': tables(['orders', 'products', 'users', 'sessions']),
+    });
+    const resFour = run(four);
+    assert.equal(resFour.rules.filter((r) => r === 'supabase/rls-off').length, 1);
+    const f = resFour.findings[0] as { title: string; fix?: string };
+    assert.match(f?.title ?? '', /4 tables/);
+    assert.match(f?.title ?? '', /orders/);
+    assert.match(f?.fix ?? '', /alter table public\.orders/);
+  });
+
   it('ignores SQL in a project that does not use Supabase', () => {
     assert.deepEqual(run(project({ 'db/schema.sql': 'create table notes (id int);\n' })).rules, []);
   });
