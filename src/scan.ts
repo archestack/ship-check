@@ -5,11 +5,21 @@ import { envFiles } from './checks/env-files.js';
 import { firebase } from './checks/firebase.js';
 import { secrets } from './checks/secrets.js';
 import { supabase } from './checks/supabase.js';
+import { webhooks } from './checks/webhook.js';
 import { loadProject } from './files.js';
 import { applyIgnores } from './ignore.js';
 import { type Finding, SEVERITIES } from './types.js';
 
-export const CHECKS = [secrets, bundleSecrets, envFiles, supabase, firebase, apiAuth, agentFiles];
+export const CHECKS = [
+  secrets,
+  bundleSecrets,
+  envFiles,
+  supabase,
+  firebase,
+  apiAuth,
+  webhooks,
+  agentFiles,
+];
 
 export interface ScanResult {
   root: string;
