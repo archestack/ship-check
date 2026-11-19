@@ -303,6 +303,31 @@ describe('API routes', () => {
   });
 });
 
+describe('webhooks', () => {
+  it('flags a Stripe webhook that never verifies the signature, passes a verified one', () => {
+    const root = project({
+      'app/api/stripe/webhook/route.ts':
+        "export async function POST(req: Request) {\n  const event = await req.json();\n  if (event.type === 'checkout.session.completed') await grant(event);\n}\n",
+      'app/api/billing/route.ts':
+        "export async function POST(req: Request) {\n  const event = stripe.webhooks.constructEvent(await req.text(), req.headers.get('stripe-signature'), secret);\n  if (event.type === 'invoice.paid') await grant(event);\n}\n",
+      'pages/api/clerk-webhook.ts':
+        'export default async function handler(req, res) { await sync(req.body); res.end(); }\n',
+      'pages/api/svix-webhook.ts':
+        "import { Webhook } from 'svix';\nexport default async function handler(req, res) { new Webhook(s).verify(req.body, req.headers); }\n",
+      'app/pricing/page.tsx':
+        "export default function Page() { return 'checkout.session.completed'; }\n",
+    });
+    const res = run(root);
+    const hits = res.findings.filter((f) => f.rule === 'webhook/unverified');
+    assert.deepEqual(hits.map((f) => [f.file, f.severity]).sort(), [
+      ['app/api/stripe/webhook/route.ts', 'high'],
+      ['pages/api/clerk-webhook.ts', 'medium'],
+    ]);
+    assert.equal(hits[0]?.line, 1);
+    assert.equal(res.status, 1);
+  });
+});
+
 describe('agent files', () => {
   it('flags a missing AGENTS.md in an app', () => {
     assert.deepEqual(run(project({ 'package.json': '{}' })).rules, ['agents/missing']);

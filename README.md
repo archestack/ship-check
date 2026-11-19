@@ -21,6 +21,7 @@ It reads your files and nothing else. No account, no upload, no network calls.
 | Built app | When a client build sits on disk (`.next/static`, `.output/public`, `.svelte-kit/output/client`, `.vercel/output/static`, or a `dist`, `build` or `out` folder with an `index.html`), the same key formats in the files the browser downloads. Run it after `npm run build` to catch a key the build inlined from an env variable. |
 | Firebase | `allow read, write: if true`, rules with no condition, test-mode date rules, and `".write": true` in Realtime Database rules. |
 | API routes | Next.js route handlers and `pages/api` files, and Express-style `app.post(...)` routes, that change data and contain no sign of an auth or session check. This one is a heuristic, so it is reported as medium. |
+| Webhooks | Stripe (and other) webhook routes that never check the sender: no `constructEvent`, signature, HMAC or secret check anywhere in the file. A fake `checkout.session.completed` then grants a free upgrade. High for Stripe, medium for other webhooks. |
 | AGENTS.md / CLAUDE.md | Missing at the root, over 200 lines, or pointing to files that do not exist. |
 
 Severities are critical, high, medium and low. The secret formats are adapted from
