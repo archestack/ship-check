@@ -15,7 +15,7 @@ const PAGES_HANDLER = /export\s+default\b/;
 const VERIFY =
   /constructEvent|svix|verif|signature|hmac|timingSafeEqual|whsec_|webhook[-_]?secret|x-hub-|authorization|bearer/i;
 
-const isWebhook = (file: SourceFile): boolean =>
+export const isWebhook = (file: SourceFile): boolean =>
   CODE.test(file.path) &&
   !/\.(?:test|spec)\./.test(file.path) &&
   (HANDLER.test(file.text) || (PAGES_API.test(file.path) && PAGES_HANDLER.test(file.text))) &&

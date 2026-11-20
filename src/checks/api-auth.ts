@@ -1,4 +1,5 @@
 import { type Check, type Finding, type SourceFile, lineAt } from '../types.js';
+import { isWebhook } from './webhook.js';
 
 const CODE = /\.(?:[cm]?[jt]sx?)$/;
 const APP_ROUTE = /(^|\/)app\/(?:.*\/)?route\.[cm]?[jt]sx?$/;
@@ -10,7 +11,7 @@ const EXPRESS_ROUTE =
 // Anything that looks like an auth, session or signature check. Broad on purpose: a missed route is
 // better than a wall of false alarms.
 const AUTH_SIGNAL =
-  /auth|session|currentUser|getUser|verify|jwt|bearer|token|clerk|signature|webhook|api[-_]?key|passport|guard|protect|permission|isAdmin|requireUser|kinde|lucia|better-auth/i;
+  /auth|session|currentUser|getUser|verify|jwt|bearer|token|clerk|signature|api[-_]?key|passport|guard|protect|permission|isAdmin|requireUser|kinde|lucia|better-auth/i;
 
 const finding = (file: SourceFile, index: number, what: string): Finding => ({
   rule: 'api/no-auth-check',
@@ -28,7 +29,8 @@ export const apiAuth: Check = ({ files }) => {
   );
   const findings: Finding[] = [];
   for (const file of files) {
-    if (!CODE.test(file.path) || AUTH_SIGNAL.test(file.text)) continue;
+    // Webhook handlers are judged by webhook/unverified (is the sender checked), not by a session.
+    if (!CODE.test(file.path) || AUTH_SIGNAL.test(file.text) || isWebhook(file)) continue;
     if (APP_ROUTE.test(file.path) && !nextMiddlewareGuards) {
       const handlers = [...file.text.matchAll(APP_HANDLER)];
       const first = handlers[0];

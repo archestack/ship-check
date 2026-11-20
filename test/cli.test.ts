@@ -326,6 +326,27 @@ describe('webhooks', () => {
     assert.equal(hits[0]?.line, 1);
     assert.equal(res.status, 1);
   });
+
+  it('reports a webhook once, and the word "webhook" no longer passes a plain route', () => {
+    const root = project({
+      // unverified webhook: only webhook/unverified, not also api/no-auth-check
+      'app/api/stripe/webhook/route.ts':
+        "export async function POST(req: Request) {\n  const event = await req.json();\n  if (event.type === 'checkout.session.completed') await grant(event);\n}\n",
+      // verified webhook through the SDK: neither rule
+      'app/api/billing/route.ts':
+        "export async function POST(req: Request) {\n  const event = stripe.webhooks.constructEvent(await req.text(), req.headers.get('x'), secret);\n  if (event.type === 'invoice.paid') await grant(event);\n}\n",
+      // not a webhook handler, only posts to one: still an open data-changing route
+      'app/api/notify/route.ts':
+        "export async function POST(req: Request) {\n  await fetch(process.env.SLACK_WEBHOOK_URL, { method: 'POST', body: await req.text() });\n}\n",
+    });
+    const byFile = (file: string) =>
+      run(root)
+        .findings.filter((f) => f.file === file)
+        .map((f) => f.rule);
+    assert.deepEqual(byFile('app/api/stripe/webhook/route.ts'), ['webhook/unverified']);
+    assert.deepEqual(byFile('app/api/billing/route.ts'), []);
+    assert.deepEqual(byFile('app/api/notify/route.ts'), ['api/no-auth-check']);
+  });
 });
 
 describe('agent files', () => {
