@@ -22,6 +22,7 @@ It reads your files and nothing else. No account, no upload, no network calls.
 | Firebase | `allow read, write: if true`, rules with no condition, test-mode date rules, and `".write": true` in Realtime Database rules. |
 | API routes | Next.js route handlers and `pages/api` files, and Express-style `app.post(...)` routes, that change data and contain no sign of an auth or session check. This one is a heuristic, so it is reported as medium. |
 | Webhooks | Stripe (and other) webhook routes that never check the sender: no `constructEvent`, signature, HMAC or secret check anywhere in the file. A fake `checkout.session.completed` then grants a free upgrade. High for Stripe, medium for other webhooks. |
+| Login rate limits | Login, sign-up, password-reset and code-check routes that verify a password or send a code themselves and show no sign of a rate limit, in the route, in middleware or in `package.json`. Routes that only call a hosted provider (Supabase, Clerk, Auth0) are left alone. Reported as medium. |
 | AGENTS.md / CLAUDE.md | Missing at the root, over 200 lines, or pointing to files that do not exist. |
 
 Severities are critical, high, medium and low. The secret formats are adapted from
