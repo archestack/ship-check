@@ -349,6 +349,56 @@ describe('webhooks', () => {
   });
 });
 
+describe('login rate limits', () => {
+  const login =
+    "import bcrypt from 'bcrypt';\nexport async function POST(req: Request) {\n  const { email, password } = await req.json();\n  const user = await db.user.find(email);\n  if (!(await bcrypt.compare(password, user.passwordHash))) return new Response('no', { status: 401 });\n  return new Response('ok');\n}\n";
+  const files = {
+    'app/api/login/route.ts': login,
+    'app/api/auth/reset-password/route.ts':
+      'export async function POST(req: Request) {\n  await resend.emails.send({ to: (await req.json()).email });\n}\n',
+    'pages/api/verify-code.ts':
+      'export default async function handler(req, res) { if (req.body.code !== (await getOtp(req.body.id))) return res.status(401).end(); res.end(); }\n',
+    'server.js':
+      "app.post('/signin', async (req, res) => { if (!await argon2.verify(u.hash, req.body.password)) return res.sendStatus(401); res.end(); });\n",
+    // hosted provider does the limiting: not flagged
+    'app/api/signin/route.ts':
+      'export async function POST(req: Request) {\n  return supabase.auth.signInWithPassword(await req.json());\n}\n',
+    // not an auth route
+    'app/api/posts/route.ts': "export async function POST() { return bcrypt.compare('a', 'b'); }\n",
+  };
+
+  it('flags own credential checks and code sends with no limiter, not hosted providers', () => {
+    const hits = run(project(files)).findings.filter((f) => f.rule === 'auth/no-rate-limit');
+    assert.deepEqual(hits.map((f) => f.file).sort(), [
+      'app/api/auth/reset-password/route.ts',
+      'app/api/login/route.ts',
+      'pages/api/verify-code.ts',
+      'server.js',
+    ]);
+    assert.ok(hits.every((f) => f.severity === 'medium'));
+  });
+
+  it('passes when the route, middleware or a dependency shows a limiter', () => {
+    const inRoute = {
+      'app/api/login/route.ts': `const { success } = await ratelimit.limit(ip);\n${login}`,
+    };
+    const inMiddleware = {
+      'app/api/login/route.ts': login,
+      'middleware.ts':
+        "import { Ratelimit } from '@upstash/ratelimit';\nexport function middleware() {}\n",
+    };
+    const inDeps = {
+      'app/api/login/route.ts': login,
+      'package.json': '{"dependencies":{"express-rate-limit":"^7.0.0"}}',
+    };
+    for (const set of [inRoute, inMiddleware, inDeps])
+      assert.deepEqual(
+        run(project(set)).findings.filter((f) => f.rule === 'auth/no-rate-limit'),
+        [],
+      );
+  });
+});
+
 describe('agent files', () => {
   it('flags a missing AGENTS.md in an app', () => {
     assert.deepEqual(run(project({ 'package.json': '{}' })).rules, ['agents/missing']);

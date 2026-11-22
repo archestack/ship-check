@@ -5,6 +5,7 @@ import { envFiles } from './checks/env-files.js';
 import { firebase } from './checks/firebase.js';
 import { secrets } from './checks/secrets.js';
 import { supabase } from './checks/supabase.js';
+import { rateLimit } from './checks/rate-limit.js';
 import { webhooks } from './checks/webhook.js';
 import { loadProject } from './files.js';
 import { applyIgnores } from './ignore.js';
@@ -18,6 +19,7 @@ export const CHECKS = [
   firebase,
   apiAuth,
   webhooks,
+  rateLimit,
   agentFiles,
 ];
 
