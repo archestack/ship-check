@@ -146,10 +146,28 @@ describe('supabase', () => {
     });
     assert.deepEqual(
       run(root).findings.map((f) => `${f.rule} ${f.severity} ${f.line}`),
+      ['supabase/rls-disabled critical 6', 'supabase/open-write-policy high 4'],
+    );
+  });
+
+  it('groups open write policies per table, worst severity first, one line per table', () => {
+    const root = project({
+      ...pkg,
+      'supabase/migrations/1.sql': [
+        'create policy "a" on public.todos for update using (true);',
+        'create policy "b" on "todos" for delete using (true);',
+        'create policy "c" on todos for update using (true);',
+        'create policy "d" on notes for insert with check (true);',
+        'create policy "e" on notes for insert with check (true);',
+        'create policy "f" on tags for all using (true);',
+      ].join('\n'),
+    });
+    assert.deepEqual(
+      run(root).findings.map((f) => `${f.severity} ${f.line} ${f.title}`),
       [
-        'supabase/rls-disabled critical 6',
-        'supabase/open-write-policy high 4',
-        'supabase/open-write-policy medium 5',
+        'high 1 Policies let anyone update, delete every row of todos',
+        'high 6 Policy lets anyone write every row',
+        'medium 4 Policy lets anyone insert every row',
       ],
     );
   });
