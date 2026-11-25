@@ -103,26 +103,73 @@ const rls = (files: SourceFile[]): Finding[] => {
         fix: 'Remove the disable statement, enable RLS in a new migration, and write policies per action.',
       });
     }
-    for (const m of file.text.matchAll(CREATE_POLICY)) {
-      const statement = m[0];
-      const action = /\bfor\s+(all|select|insert|update|delete)\b/i.exec(statement)?.[1] ?? 'all';
-      if (action.toLowerCase() === 'select' || !OPEN_POLICY.test(statement)) continue;
-      // An open insert is sometimes meant (a contact form); update, delete and all never are.
-      const insertOnly = action.toLowerCase() === 'insert';
-      findings.push({
-        rule: 'supabase/open-write-policy',
-        severity: insertOnly ? 'medium' : 'high',
-        title: `Policy lets anyone ${action.toLowerCase() === 'all' ? 'write' : action.toLowerCase()} every row`,
-        file: file.path,
-        line: lineAt(file.text, m.index ?? 0),
-        why: insertOnly
-          ? '`with check (true)` lets every caller add rows; fine for a public form, a spam and storage hole anywhere else.'
-          : '`using (true)` or `with check (true)` passes for every caller, so RLS is on but protects nothing.',
-        fix: 'Compare the row owner with auth.uid(), e.g. `using (auth.uid() = user_id)`.',
-      });
-    }
+    findings.push(...openWritePolicies(file));
   }
   return findings;
+};
+
+interface OpenPolicy {
+  table: string;
+  actions: string[];
+  line: number;
+}
+
+const POLICY_TABLE = /\bon\s+((?:"[^"]+"|[\w$]+)(?:\s*\.\s*(?:"[^"]+"|[\w$]+))?)/i;
+const OPEN_FIX = 'Compare the row owner with auth.uid(), e.g. `using (auth.uid() = user_id)`.';
+const OPEN_WHY =
+  '`using (true)` or `with check (true)` passes for every caller, so RLS is on but protects nothing.';
+const OPEN_INSERT_WHY =
+  '`with check (true)` lets every caller add rows; fine for a public form, a spam and storage hole anywhere else.';
+
+/**
+ * One finding per open policy, except a table with several of them in one file: those become one
+ * finding at the worst severity, listing the actions, so a schema with a dozen `using (true)`
+ * policies reads as a dozen tables, not thirty lines.
+ */
+const openWritePolicies = (file: SourceFile): Finding[] => {
+  const byTable = new Map<string, OpenPolicy>();
+  const found: OpenPolicy[] = [];
+  for (const m of file.text.matchAll(CREATE_POLICY)) {
+    const statement = m[0];
+    const action = (
+      /\bfor\s+(all|select|insert|update|delete)\b/i.exec(statement)?.[1] ?? 'all'
+    ).toLowerCase();
+    if (action === 'select' || !OPEN_POLICY.test(statement)) continue;
+    const on = POLICY_TABLE.exec(statement)?.[1]?.replaceAll(/\s+/g, '');
+    const { schema, table } = tableName(on ?? '');
+    const key = on ? `${schema}.${table}` : '';
+    const seen = key ? byTable.get(key) : undefined;
+    if (seen) {
+      if (!seen.actions.includes(action)) seen.actions.push(action);
+      continue;
+    }
+    const open: OpenPolicy = {
+      table: on ? table : '',
+      actions: [action],
+      line: lineAt(file.text, m.index ?? 0),
+    };
+    if (key) byTable.set(key, open);
+    found.push(open);
+  }
+  return found.map((open) => policyFinding(file.path, open));
+};
+
+const policyFinding = (path: string, { table, actions, line }: OpenPolicy): Finding => {
+  const insertOnly = actions.every((a) => a === 'insert');
+  const verb = (a: string) => (a === 'all' ? 'write' : a);
+  const list = actions.map(verb).join(', ');
+  return {
+    rule: 'supabase/open-write-policy',
+    severity: insertOnly ? 'medium' : 'high',
+    title:
+      table && actions.length > 1
+        ? `Policies let anyone ${list} every row of ${table}`
+        : `Policy lets anyone ${list} every row`,
+    file: path,
+    line,
+    why: insertOnly ? OPEN_INSERT_WHY : OPEN_WHY,
+    fix: OPEN_FIX,
+  };
 };
 
 const BUCKETS = String.raw`"?storage"?\s*\.\s*"?buckets"?`;
