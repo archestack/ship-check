@@ -1,6 +1,6 @@
 import { agentFiles } from './checks/agent-files.js';
 import { apiAuth } from './checks/api-auth.js';
-import { bundleSecrets } from './checks/bundle.js';
+import { bundleSecrets, bundleSourceMaps } from './checks/bundle.js';
 import { envFiles } from './checks/env-files.js';
 import { firebase } from './checks/firebase.js';
 import { secrets } from './checks/secrets.js';
@@ -14,6 +14,7 @@ import { type Finding, SEVERITIES } from './types.js';
 export const CHECKS = [
   secrets,
   bundleSecrets,
+  bundleSourceMaps,
   envFiles,
   supabase,
   firebase,
