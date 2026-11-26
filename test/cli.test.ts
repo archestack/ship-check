@@ -562,6 +562,31 @@ describe('built bundle', () => {
     assert.deepEqual(server.rules, []);
   });
 
+  it('reports source maps in the client build, once per build', () => {
+    const files = {
+      'build/index.html': '<script src="/static/js/main.js">',
+      'build/static/js/main.js': 'var a=1;',
+      'build/static/js/main.js.map':
+        '{"version":3,"sources":["a.js"],"sourcesContent":["var a=1;"],"mappings":""}',
+      'build/static/js/2.chunk.js.map': '{"version":3,"sources":[],"mappings":""}',
+    };
+    const res = run(project(files));
+    assert.deepEqual(
+      res.findings.map((f) => `${f.file} ${f.rule} ${f.severity}`),
+      ['build/static/js/main.js.map bundle/source-map medium'],
+    );
+    assert.match(res.findings[0]?.title ?? '', /2 source map files .* 1 with your original source/);
+    const bare = run(
+      project({ ...files, 'build/static/js/main.js.map': '{"version":3,"mappings":""}' }),
+    );
+    assert.deepEqual(
+      bare.findings.map((f) => f.severity),
+      ['low'],
+    );
+    const server = run(project({ 'dist/server.js.map': '{}', 'dist/server.js': 'listen()' }));
+    assert.deepEqual(server.rules, []);
+  });
+
   it('skips the public Supabase anon key and honours .shipcheckignore', () => {
     const anon = jwt({ role: 'anon', iss: 'supabase' });
     const root = project({

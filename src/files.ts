@@ -1,7 +1,15 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import {
+  closeSync,
+  existsSync,
+  openSync,
+  readdirSync,
+  readFileSync,
+  readSync,
+  statSync,
+} from 'node:fs';
 import { join } from 'node:path';
-import type { Project, SourceFile } from './types.js';
+import type { BundleMap, Project, SourceFile } from './types.js';
 
 const SKIP_DIRS = new Set([
   'node_modules',
@@ -89,13 +97,14 @@ const BUNDLE_BUDGET = 100_000_000; // a large static site can hold hundreds of M
 const dirExists = (root: string, dir: string): boolean =>
   statSync(join(root, dir), { throwIfNoEntry: false })?.isDirectory() ?? false;
 
+const bundleDirs = (root: string): string[] => [
+  ...CLIENT_DIRS.filter((dir) => dirExists(root, dir)),
+  ...SPA_DIRS.filter((dir) => dirExists(root, dir) && existsSync(join(root, dir, 'index.html'))),
+];
+
 /** Text files of the client build folders present on disk (they are usually gitignored). */
 export const loadBundle = (root: string): SourceFile[] => {
-  const dirs = [
-    ...CLIENT_DIRS.filter((dir) => dirExists(root, dir)),
-    ...SPA_DIRS.filter((dir) => dirExists(root, dir) && existsSync(join(root, dir, 'index.html'))),
-  ];
-  const paths = dirs
+  const paths = bundleDirs(root)
     .flatMap((dir) => walkAll(root, dir))
     .filter((path) => BUNDLE_FILE.test(path))
     // Script files first: inlined keys land there, and pages only repeat them.
@@ -112,6 +121,30 @@ export const loadBundle = (root: string): SourceFile[] => {
   }
   return files;
 };
+
+const MAP_HEAD_BYTES = 200_000;
+
+/** Source map files the client build folders hold; `withSources` when the map embeds the original code. */
+export const loadBundleMaps = (root: string): BundleMap[] =>
+  bundleDirs(root)
+    .flatMap((dir) => walkAll(root, dir))
+    .filter((path) => path.endsWith('.map'))
+    .slice(0, BUNDLE_MAX_FILES)
+    .map((path) => {
+      let head = '';
+      try {
+        const fd = openSync(join(root, path), 'r');
+        try {
+          const buffer = Buffer.alloc(MAP_HEAD_BYTES);
+          head = buffer.subarray(0, readSync(fd, buffer, 0, MAP_HEAD_BYTES, 0)).toString('utf8');
+        } finally {
+          closeSync(fd);
+        }
+      } catch {
+        // unreadable: still a map file the folder serves
+      }
+      return { path, withSources: head.includes('"sourcesContent"') };
+    });
 
 // Like walk, but inside a build folder, where names such as `out` or `build` are real subfolders.
 const walkAll = (root: string, dir: string): string[] =>
@@ -135,6 +168,7 @@ export const loadProject = (root: string): Project => {
     root,
     files,
     bundle: loadBundle(root),
+    bundleMaps: loadBundleMaps(root),
     git: fromGit !== undefined,
     exists: (path) => existsSync(join(root, path)),
   };

@@ -17,11 +17,19 @@ export interface SourceFile {
   text: string;
 }
 
+export interface BundleMap {
+  path: string;
+  /** The map embeds the original source files (`sourcesContent`), not only names and positions. */
+  withSources: boolean;
+}
+
 export interface Project {
   root: string;
   files: SourceFile[];
   /** Client build output on disk (`.next/static`, a `dist` with index.html, ...), read only for keys. */
   bundle: SourceFile[];
+  /** Source map files in those same build folders. */
+  bundleMaps: BundleMap[];
   /** True when the file list came from git, so ignored files are already left out. */
   git: boolean;
   exists: (relativePath: string) => boolean;
