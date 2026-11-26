@@ -448,6 +448,35 @@ describe('session cookies', () => {
   });
 });
 
+describe('JWT secrets', () => {
+  const ruleFor = (code: string, path = 'src/auth.ts') => run(project({ [path]: code })).rules;
+
+  it('flags a secret typed into jwt.sign or jwt.verify, and an env secret with a typed default', () => {
+    assert.deepEqual(ruleFor("const t = jwt.sign({ id }, 'changeme', { expiresIn: '1d' });\n"), [
+      'auth/hardcoded-jwt-secret',
+    ]);
+    assert.deepEqual(ruleFor('const p = jwt.verify(token, "my-secret");\n'), [
+      'auth/hardcoded-jwt-secret',
+    ]);
+    assert.deepEqual(ruleFor("const s = process.env.JWT_SECRET || 'secret';\n"), [
+      'auth/hardcoded-jwt-secret',
+    ]);
+    assert.deepEqual(ruleFor('const s = process.env.NEXTAUTH_SECRET ?? "dev-secret";\n'), [
+      'auth/hardcoded-jwt-secret',
+    ]);
+  });
+
+  it('leaves env secrets, other variables and test files alone', () => {
+    assert.deepEqual(ruleFor('const t = jwt.sign({ id }, process.env.JWT_SECRET);\n'), []);
+    assert.deepEqual(ruleFor('const t = jwt.sign({ id }, secret, { expiresIn: "1d" });\n'), []);
+    assert.deepEqual(ruleFor('const p = jwt.verify(token, `${prefix}-x`);\n'), []);
+    assert.deepEqual(ruleFor("const u = process.env.API_URL || 'http://localhost';\n"), []);
+    assert.deepEqual(ruleFor("const k = process.env.JWT_ISSUER || 'app';\n"), []);
+    assert.deepEqual(ruleFor("const s = process.env.JWT_SECRET || '';\n"), []);
+    assert.deepEqual(ruleFor("jwt.sign({}, 'secret');\n", 'src/auth.test.ts'), []);
+  });
+});
+
 describe('agent files', () => {
   it('flags a missing AGENTS.md in an app', () => {
     assert.deepEqual(run(project({ 'package.json': '{}' })).rules, ['agents/missing']);

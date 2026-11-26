@@ -4,6 +4,7 @@ import { bundleSecrets, bundleSourceMaps } from './checks/bundle.js';
 import { cookies } from './checks/cookies.js';
 import { envFiles } from './checks/env-files.js';
 import { firebase } from './checks/firebase.js';
+import { jwtSecrets } from './checks/jwt.js';
 import { secrets } from './checks/secrets.js';
 import { supabase } from './checks/supabase.js';
 import { rateLimit } from './checks/rate-limit.js';
@@ -23,6 +24,7 @@ export const CHECKS = [
   webhooks,
   rateLimit,
   cookies,
+  jwtSecrets,
   agentFiles,
 ];
 

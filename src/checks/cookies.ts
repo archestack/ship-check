@@ -10,7 +10,7 @@ const SESSION_NAME = /sess|token|auth|jwt|\bsid\b|login|access|refresh/i;
 const MAX_ARGS = 800;
 
 /** The text between the call's parentheses, or undefined when it does not close within the limit. */
-const argsAt = (text: string, open: number): string | undefined => {
+export const argsAt = (text: string, open: number): string | undefined => {
   let depth = 0;
   let quote = '';
   for (let i = open; i < Math.min(text.length, open + MAX_ARGS); i++) {
@@ -26,7 +26,7 @@ const argsAt = (text: string, open: number): string | undefined => {
 };
 
 /** Top-level arguments, split on commas outside brackets and quotes. */
-const splitArgs = (args: string): string[] => {
+export const splitArgs = (args: string): string[] => {
   const out: string[] = [];
   let depth = 0;
   let quote = '';
