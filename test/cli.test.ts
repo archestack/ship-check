@@ -417,6 +417,37 @@ describe('login rate limits', () => {
   });
 });
 
+describe('session cookies', () => {
+  const ruleFor = (code: string) => run(project({ 'src/auth.ts': code })).rules;
+
+  it('flags a session or token cookie set without httpOnly, with or without options', () => {
+    assert.deepEqual(ruleFor("res.cookie('session', token);\n"), ['cookie/not-http-only']);
+    assert.deepEqual(ruleFor("res.cookie('access_token', t, { secure: true, maxAge: 9 });\n"), [
+      'cookie/not-http-only',
+    ]);
+    assert.deepEqual(ruleFor("cookies().set('sb-auth', jwt, { httpOnly: false });\n"), [
+      'cookie/not-http-only',
+    ]);
+    assert.deepEqual(ruleFor("cookieStore.set({ name: 'session', value: id, path: '/' });\n"), [
+      'cookie/not-http-only',
+    ]);
+  });
+
+  it('leaves httpOnly cookies, other cookies and options it cannot read alone', () => {
+    assert.deepEqual(ruleFor("res.cookie('session', t, { httpOnly: true, secure: true });\n"), []);
+    assert.deepEqual(ruleFor("res.cookie('theme', 'dark');\n"), []);
+    assert.deepEqual(ruleFor("cookies().set('session', t, options);\n"), []);
+    assert.deepEqual(ruleFor("res.cookie('session', t, { ...base, maxAge: 9 });\n"), []);
+    assert.deepEqual(ruleFor("res.cookie('session', t, { httpOnly: !isDev });\n"), []);
+    assert.deepEqual(
+      ruleFor("cookieStore.set({ name: 'session', value: id, httpOnly: true });\n"),
+      [],
+    );
+    const tests = run(project({ 'src/auth.test.ts': "res.cookie('session', t);\n" }));
+    assert.deepEqual(tests.rules, []);
+  });
+});
+
 describe('agent files', () => {
   it('flags a missing AGENTS.md in an app', () => {
     assert.deepEqual(run(project({ 'package.json': '{}' })).rules, ['agents/missing']);
