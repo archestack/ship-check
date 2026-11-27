@@ -2,6 +2,7 @@ import { agentFiles } from './checks/agent-files.js';
 import { apiAuth } from './checks/api-auth.js';
 import { bundleSecrets, bundleSourceMaps } from './checks/bundle.js';
 import { cookies } from './checks/cookies.js';
+import { cors } from './checks/cors.js';
 import { envFiles } from './checks/env-files.js';
 import { firebase } from './checks/firebase.js';
 import { jwtSecrets } from './checks/jwt.js';
@@ -24,6 +25,7 @@ export const CHECKS = [
   webhooks,
   rateLimit,
   cookies,
+  cors,
   jwtSecrets,
   agentFiles,
 ];

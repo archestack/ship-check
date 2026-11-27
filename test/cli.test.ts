@@ -477,6 +477,47 @@ describe('JWT secrets', () => {
   });
 });
 
+describe('cors', () => {
+  const ruleFor = (code: string, path = 'src/server.ts') => run(project({ [path]: code })).rules;
+
+  it('flags an API that accepts every origin and allows credentials', () => {
+    assert.deepEqual(ruleFor('app.use(cors({ origin: true, credentials: true }));\n'), [
+      'cors/reflect-origin-credentials',
+    ]);
+    assert.deepEqual(ruleFor('app.use(cors({\n  credentials: true,\n  origin: true,\n}));\n'), [
+      'cors/reflect-origin-credentials',
+    ]);
+    assert.deepEqual(
+      ruleFor('app.use(cors({ origin: (o, cb) => cb(null, true), credentials: true }));\n'),
+      ['cors/reflect-origin-credentials'],
+    );
+    assert.deepEqual(
+      ruleFor(
+        "res.setHeader('Access-Control-Allow-Origin', req.headers.origin);\nres.setHeader('Access-Control-Allow-Credentials', 'true');\n",
+      ),
+      ['cors/reflect-origin-credentials'],
+    );
+  });
+
+  it('leaves allow-lists, public APIs without credentials and test files alone', () => {
+    assert.deepEqual(
+      ruleFor("app.use(cors({ origin: 'https://app.example', credentials: true }));\n"),
+      [],
+    );
+    assert.deepEqual(ruleFor('app.use(cors({ origin: allowed, credentials: true }));\n'), []);
+    assert.deepEqual(ruleFor('app.use(cors({ origin: true }));\n'), []);
+    assert.deepEqual(ruleFor('app.use(cors({ origin: true, credentials: false }));\n'), []);
+    assert.deepEqual(
+      ruleFor("res.setHeader('Access-Control-Allow-Origin', req.headers.origin);\n"),
+      [],
+    );
+    assert.deepEqual(
+      ruleFor('app.use(cors({ origin: true, credentials: true }));\n', 'src/server.test.ts'),
+      [],
+    );
+  });
+});
+
 describe('agent files', () => {
   it('flags a missing AGENTS.md in an app', () => {
     assert.deepEqual(run(project({ 'package.json': '{}' })).rules, ['agents/missing']);
